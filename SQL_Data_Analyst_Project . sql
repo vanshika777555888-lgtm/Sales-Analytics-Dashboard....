@@ -1,0 +1,1420 @@
+-- QUERY 1
+CREATE TABLE customers (
+   customer_id INT PRIMARY KEY,
+   customer_name VARCHAR(100),
+   email VARCHAR(150) UNIQUE,
+   city VARCHAR(50),
+   registration_date DATE
+);
+
+
+-- QUERY 2
+INSERT INTO customers
+(customer_id, customer_name, email, city, registration_date)
+SELECT
+  i,
+  'Customer ' || i,
+  'customer' || i || '@gmail.com',
+  (ARRAY[
+     'Delhi',
+     'Mumbai',
+     'Bangalore',
+     'Chennai',
+     'Kolkata',
+     'Hyderabad',
+     'Pune',
+     'Jaipur',
+     'Ahmedabad',
+     'Lucknow'
+  ])[1 + floor(random() * 10)::int],
+  CURRENT_DATE - floor(random() * 1000)::int
+FROM generate_series(1, 1000) AS i;
+
+
+-- QUERY 3
+SELECT * FROM customers;
+
+
+-- QUERY 4
+CREATE TABLE products (
+   product_id INT PRIMARY KEY,
+   product_name VARCHAR(100),
+   category VARCHAR(50),
+   price DECIMAL(10,2),
+   cost DECIMAL(10,2)
+);
+
+
+-- QUERY 5
+INSERT INTO products
+(product_id, product_name, category, price, cost)
+SELECT
+  i,
+  'Product ' || i,
+  (ARRAY[
+     'Electronics',
+     'Clothing',
+     'Home & Kitchen',
+     'Beauty',
+     'Sports',
+     'Books',
+     'Grocery',
+     'Accessories'
+  ])[1 + floor(random() * 8)::int],
+  ROUND((500 + random() * 19500)::numeric, 2),
+  ROUND((200 + random() * 12000)::numeric, 2)
+FROM generate_series(1, 100) AS i;
+
+
+-- QUERY 6
+SELECT * FROM products;
+
+
+-- QUERY 7
+CREATE TABLE orders (
+   order_id INT PRIMARY KEY,
+   customer_id INT,
+   order_date DATE,
+   payment_method VARCHAR(30),
+   FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+);
+
+
+-- QUERY 8
+INSERT INTO orders
+(order_id, customer_id, order_date, payment_method)
+SELECT
+  i,
+  1 + floor(random() * 1000)::int,
+  CURRENT_DATE - floor(random() * 730)::int,
+  (ARRAY[
+     'UPI',
+     'Credit Card',
+     'Debit Card',
+     'Cash',
+     'Net Banking'
+  ])[1 + floor(random() * 5)::int]
+FROM generate_series(1, 1000) AS i;
+
+
+-- QUERY 9
+SELECT * FROM orders;
+
+
+-- QUERY 10
+CREATE TABLE order_items (
+  order_item_id INT PRIMARY KEY,
+  order_id INT,
+  product_id INT,
+  quantity INT,
+  FOREIGN KEY (order_id) REFERENCES orders(order_id),
+  FOREIGN KEY (product_id) REFERENCES products(product_id)
+);
+
+
+-- QUERY 11
+INSERT INTO order_items
+(order_item_id, order_id, product_id, quantity)
+SELECT
+  i,
+  1 + floor(random() * 1000)::int,
+  1 + floor(random() * 100)::int,
+  1 + floor(random() * 5)::int
+FROM generate_series(1, 2000) AS i;
+
+
+-- QUERY 12
+SELECT * FROM order_items;
+
+
+-- QUERY 13
+SELECT 'Customers' AS table_name, COUNT(*) AS total_records
+FROM customers
+
+UNION ALL
+
+SELECT 'Products', COUNT(*)
+FROM products
+
+UNION ALL
+
+SELECT 'Orders', COUNT(*)
+FROM orders
+
+UNION ALL
+
+SELECT 'Order Items', COUNT(*)
+FROM order_items;
+
+
+-- QUERY 14
+-- Check for NULL values
+-- Identify missing data in important columns
+SELECT
+   'customers' AS table_name,
+   COUNT(*) FILTER (WHERE customer_name IS NULL) AS null_customer_name,
+   COUNT(*) FILTER (WHERE email IS NULL) AS null_email,
+   COUNT(*) FILTER (WHERE city IS NULL) AS null_city,
+   COUNT(*) FILTER (WHERE registration_date IS NULL) AS null_registration_date
+FROM customers
+
+UNION ALL
+
+SELECT
+  'products',
+  COUNT(*) FILTER (WHERE product_name IS NULL),
+  COUNT(*) FILTER (WHERE category IS NULL),
+  COUNT(*) FILTER (WHERE price IS NULL),
+  COUNT(*) FILTER (WHERE cost IS NULL)
+FROM products
+
+UNION ALL
+
+SELECT
+  'orders',
+  COUNT(*) FILTER (WHERE customer_id IS NULL),
+  COUNT(*) FILTER (WHERE order_date IS NULL),
+  COUNT(*) FILTER (WHERE payment_method IS NULL),
+  0
+FROM orders
+
+UNION ALL
+
+SELECT
+  'order_items',
+  COUNT(*) FILTER (WHERE order_id IS NULL),
+  COUNT(*) FILTER (WHERE product_id IS NULL),
+  COUNT(*) FILTER (WHERE quantity IS NULL),
+  0
+FROM order_items;
+
+
+-- QUERY 15
+-- Check for duplicate records
+SELECT
+   'customers' AS table_name,
+   COUNT(*) AS total_records,
+   COUNT(DISTINCT customer_id) AS unique_ids
+FROM customers
+
+UNION ALL
+
+SELECT
+  'products',
+  COUNT(*),
+  COUNT(DISTINCT product_id)
+FROM products
+
+UNION ALL
+
+SELECT
+  'orders',
+  COUNT(*),
+  COUNT(DISTINCT order_id)
+FROM orders
+
+UNION ALL
+
+SELECT
+  'order_items',
+  COUNT(*),
+  COUNT(DISTINCT order_item_id)
+FROM order_items;
+
+
+-- QUERY 16
+-- Check for invalid numerical values
+SELECT
+   'Products - Invalid Price' AS check_type,
+   COUNT(*) AS problem_records
+FROM products
+WHERE price <= 0
+
+UNION ALL
+
+SELECT
+  'Products - Invalid Cost',
+  COUNT(*)
+FROM products
+WHERE cost <= 0
+
+UNION ALL
+
+SELECT
+  'Products - Cost Greater Than Price',
+  COUNT(*)
+FROM products
+WHERE cost > price
+
+UNION ALL
+
+SELECT
+  'Order Items - Invalid Quantity',
+  COUNT(*)
+FROM order_items
+WHERE quantity <= 0;
+
+
+-- QUERY 17
+-- Check dates and categories
+SELECT
+    'Future Order Dates' AS check_type,
+    COUNT(*) AS problem_records
+FROM orders
+WHERE order_date > CURRENT_DATE
+
+UNION ALL
+
+SELECT
+  'Future Registration Dates',
+  COUNT(*)
+FROM customers
+WHERE registration_date > CURRENT_DATE
+
+UNION ALL
+
+SELECT
+  'Invalid Payment Methods',
+  COUNT(*)
+FROM orders
+WHERE payment_method NOT IN (
+  'UPI',
+  'Credit Card',
+  'Debit Card',
+  'Cash',
+  'Net Banking'
+)
+
+UNION ALL
+
+SELECT
+  'Invalid Product Categories',
+  COUNT(*)
+FROM products
+WHERE category NOT IN (
+  'Electronics',
+  'Clothing',
+  'Home & Kitchen',
+  'Beauty',
+  'Sports',
+  'Books',
+  'Grocery',
+  'Accessories'
+);
+
+
+-- QUERY 18
+-- Check relationships between tables
+SELECT
+    'Orders with Invalid Customer ID' AS check_type,
+    COUNT(*) AS problem_records
+FROM orders o
+LEFT JOIN customers c
+    ON o.customer_id = c.customer_id
+WHERE c.customer_id IS NULL
+
+UNION ALL
+
+SELECT
+  'Order Items with Invalid Order ID',
+  COUNT(*)
+FROM order_items oi
+LEFT JOIN orders o
+  ON oi.order_id = o.order_id
+WHERE o.order_id IS NULL
+
+UNION ALL
+
+SELECT
+  'Order Items with Invalid Product ID',
+  COUNT(*)
+FROM order_items oi
+LEFT JOIN products p
+  ON oi.product_id = p.product_id
+WHERE p.product_id IS NULL;
+
+-- QUERY 19
+-- View the customer dataset
+SELECT *
+FROM customers;
+
+
+-- QUERY 20
+-- Filter customers by city
+SELECT *
+FROM customers
+WHERE city = 'Delhi';
+
+
+-- QUERY 21
+-- Filter customers using multiple conditions
+SELECT *
+FROM customers
+WHERE city = 'Delhi'
+  AND customer_id > 500;
+
+
+-- QUERY 22
+-- Filter customers using OR
+SELECT *
+FROM customers
+WHERE city = 'Delhi'
+   OR city = 'Mumbai';
+
+
+-- QUERY 23
+-- Find unique customer cities
+SELECT DISTINCT city
+FROM customers
+ORDER BY city;
+
+
+-- QUERY 24
+-- Sort customers by registration date
+SELECT *
+FROM customers
+ORDER BY registration_date DESC;
+
+
+-- QUERY 25
+-- Get the top 10 most recently registered customers
+SELECT *
+FROM customers
+ORDER BY registration_date DESC
+LIMIT 10;
+
+
+-- QUERY 26
+-- Filter customers from multiple cities
+SELECT *
+FROM customers
+WHERE city IN ('Delhi', 'Mumbai', 'Pune');
+
+
+-- QUERY 27
+-- Filter customers within a date range
+SELECT *
+FROM customers
+WHERE registration_date BETWEEN CURRENT_DATE - 365 AND CURRENT_DATE;
+
+
+-- QUERY 28
+-- Search customers by name pattern
+SELECT *
+FROM customers
+WHERE customer_name LIKE 'Customer 1%';
+
+
+-- QUERY 29
+-- Find customers with missing email addresses
+SELECT *
+FROM customers
+WHERE email IS NULL;
+
+
+-- QUERY 30
+-- Count total customers
+SELECT COUNT(*) AS total_customers
+FROM customers;
+
+
+-- QUERY 31
+-- Calculate total product selling value
+SELECT
+   SUM(price) AS total_product_value
+FROM products;
+
+
+-- QUERY 32
+-- Calculate average product price
+SELECT
+   ROUND(AVG(price), 2) AS average_product_price
+FROM products;
+
+
+-- QUERY 33
+-- Find minimum and maximum product prices
+SELECT
+   MIN(price) AS minimum_price,
+   MAX(price) AS maximum_price
+FROM products;
+
+
+-- QUERY 34
+-- Count products by category
+SELECT
+   category,
+   COUNT(*) AS total_products
+FROM products
+GROUP BY category
+ORDER BY total_products DESC;
+
+
+-- QUERY 35
+-- Calculate total product value by category
+SELECT
+   category,
+   ROUND(SUM(price), 2) AS total_product_value
+FROM products
+GROUP BY category
+ORDER BY total_product_value DESC;
+
+
+-- QUERY 36
+-- Calculate average product price by category
+SELECT
+   category,
+   ROUND(AVG(price), 2) AS average_product_price
+FROM products
+GROUP BY category
+ORDER BY average_product_price DESC;
+
+-- QUERY 37
+-- Filter grouped results using HAVING
+SELECT
+   category,
+   COUNT(*) AS total_products
+FROM products
+GROUP BY category
+HAVING COUNT(*) > 5
+ORDER BY total_products DESC;
+
+
+-- QUERY 38
+-- Calculate total sales revenue
+SELECT
+   ROUND(SUM(p.price * oi.quantity), 2) AS total_sales_revenue
+FROM orders o
+JOIN order_items oi
+   ON o.order_id = oi.order_id
+JOIN products p
+   ON oi.product_id = p.product_id;
+
+
+-- QUERY 39
+-- Calculate total profit
+SELECT
+   ROUND(SUM((p.price - p.cost) * oi.quantity), 2) AS total_profit
+FROM order_items oi
+JOIN products p
+   ON oi.product_id = p.product_id;
+
+
+-- QUERY 40
+-- Calculate sales revenue and profit by category
+SELECT
+   p.category,
+   ROUND(SUM(p.price * oi.quantity), 2) AS total_sales,
+   ROUND(SUM((p.price - p.cost) * oi.quantity), 2) AS total_profit
+FROM order_items oi
+JOIN products p
+   ON oi.product_id = p.product_id
+GROUP BY p.category
+ORDER BY total_sales DESC;
+
+
+-- QUERY 41
+-- Calculate total spending by customer
+SELECT
+   c.customer_id,
+   c.customer_name,
+   ROUND(SUM(p.price * oi.quantity), 2) AS total_spending
+FROM customers c
+JOIN orders o
+   ON c.customer_id = o.customer_id
+JOIN order_items oi
+   ON o.order_id = oi.order_id
+JOIN products p
+   ON oi.product_id = p.product_id
+GROUP BY
+   c.customer_id,
+   c.customer_name
+ORDER BY total_spending DESC;
+
+
+-- QUERY 42
+-- Calculate Average Order Value
+SELECT
+   ROUND(
+      SUM(p.price * oi.quantity) / COUNT(DISTINCT o.order_id),
+      2
+   ) AS average_order_value
+FROM orders o
+JOIN order_items oi
+  ON o.order_id = oi.order_id
+JOIN products p
+  ON oi.product_id = p.product_id;
+
+
+-- QUERY 43
+-- Calculate monthly sales revenue
+SELECT
+   DATE_TRUNC('month', o.order_date) AS sales_month,
+   ROUND(SUM(p.price * oi.quantity), 2) AS monthly_sales
+FROM orders o
+JOIN order_items oi
+   ON o.order_id = oi.order_id
+JOIN products p
+   ON oi.product_id = p.product_id
+GROUP BY DATE_TRUNC('month', o.order_date)
+ORDER BY sales_month;
+
+
+-- QUERY 44
+-- Identify the top 10 customers by total spending
+SELECT
+    c.customer_id,
+    c.customer_name,
+    ROUND(SUM(p.price * oi.quantity), 2) AS total_spending
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+JOIN products p
+    ON oi.product_id = p.product_id
+GROUP BY
+    c.customer_id,
+    c.customer_name
+ORDER BY total_spending DESC
+LIMIT 10;
+
+
+-- QUERY 45
+-- Connect customers with their orders
+SELECT
+   c.customer_id,
+   c.customer_name,
+   o.order_id,
+   o.order_date,
+   o.payment_method
+FROM customers c
+INNER JOIN orders o
+  ON c.customer_id = o.customer_id
+ORDER BY o.order_date DESC;
+
+
+-- QUERY 46
+-- Find all customers and their orders
+SELECT
+   c.customer_id,
+   c.customer_name,
+   o.order_id,
+   o.order_date,
+   o.payment_method
+FROM customers c
+LEFT JOIN orders o
+   ON c.customer_id = o.customer_id
+ORDER BY c.customer_id;
+
+
+-- QUERY 47
+-- Connect orders with customer information using RIGHT JOIN
+SELECT
+   c.customer_id,
+   c.customer_name,
+   o.order_id,
+   o.order_date,
+   o.payment_method
+FROM customers c
+RIGHT JOIN orders o
+   ON c.customer_id = o.customer_id
+ORDER BY o.order_id;
+
+
+-- QUERY 48
+-- Combine customer, order, and product information
+SELECT
+   c.customer_id,
+   c.customer_name,
+   o.order_id,
+   o.order_date,
+   p.product_name,
+   p.category,
+   oi.quantity,
+   p.price
+FROM customers c
+INNER JOIN orders o
+  ON c.customer_id = o.customer_id
+INNER JOIN order_items oi
+  ON o.order_id = oi.order_id
+INNER JOIN products p
+  ON oi.product_id = p.product_id
+ORDER BY o.order_date DESC;
+
+
+-- QUERY 49
+-- Filter joined data by product category
+SELECT
+   c.customer_id,
+   c.customer_name,
+   o.order_id,
+   o.order_date,
+   p.product_name,
+   p.category,
+   oi.quantity,
+   p.price
+FROM customers c
+INNER JOIN orders o
+  ON c.customer_id = o.customer_id
+INNER JOIN order_items oi
+  ON o.order_id = oi.order_id
+INNER JOIN products p
+  ON oi.product_id = p.product_id
+WHERE p.category = 'Electronics'
+ORDER BY o.order_date DESC;
+
+
+-- QUERY 50
+-- Calculate total units sold by category
+SELECT
+   p.category,
+   SUM(oi.quantity) AS total_units_sold
+FROM order_items oi
+INNER JOIN products p
+   ON oi.product_id = p.product_id
+GROUP BY p.category
+ORDER BY total_units_sold DESC;
+
+
+-- QUERY 51
+-- Analyze customer order activity
+SELECT
+   c.customer_id,
+   c.customer_name,
+   COUNT(DISTINCT o.order_id) AS total_orders,
+   SUM(oi.quantity) AS total_units_purchased
+FROM customers c
+INNER JOIN orders o
+  ON c.customer_id = o.customer_id
+INNER JOIN order_items oi
+  ON o.order_id = oi.order_id
+GROUP BY
+  c.customer_id,
+  c.customer_name
+ORDER BY total_orders DESC;
+
+
+-- QUERY 52
+-- Identify customers with no orders
+SELECT
+   c.customer_id,
+   c.customer_name,
+   COUNT(o.order_id) AS total_orders
+FROM customers c
+LEFT JOIN orders o
+   ON c.customer_id = o.customer_id
+GROUP BY
+   c.customer_id,
+   c.customer_name
+HAVING COUNT(o.order_id) = 0
+ORDER BY c.customer_id;
+
+
+-- QUERY 53
+-- Identify products with no sales
+SELECT
+    p.product_id,
+    p.product_name,
+    p.category,
+    p.price
+FROM products p
+LEFT JOIN order_items oi
+    ON p.product_id = oi.product_id
+WHERE oi.product_id IS NULL
+ORDER BY p.product_id;
+
+
+-- QUERY 54
+-- Find products priced above the average
+SELECT
+   product_id,
+   product_name,
+   category,
+   price
+FROM products
+WHERE price > (
+  SELECT AVG(price)
+  FROM products
+)
+ORDER BY price DESC;
+
+
+-- QUERY 55
+-- Classify products by price range
+SELECT
+   product_id,
+   product_name,
+   category,
+   price,
+   CASE
+      WHEN price < 5000 THEN 'Low Price'
+      WHEN price BETWEEN 5000 AND 10000 THEN 'Medium Price'
+      ELSE 'High Price'
+   END AS price_segment
+FROM products
+ORDER BY price DESC;
+
+
+-- QUERY 56
+-- Replace NULL values with zero
+SELECT
+   c.customer_id,
+   c.customer_name,
+   COALESCE(COUNT(o.order_id), 0) AS total_orders
+FROM customers c
+LEFT JOIN orders o
+   ON c.customer_id = o.customer_id
+GROUP BY
+   c.customer_id,
+   c.customer_name
+ORDER BY total_orders;
+
+-- QUERY 57
+-- Find high-value customers using a CTE
+WITH customer_spending AS (
+   SELECT
+      c.customer_id,
+      c.customer_name,
+      SUM(p.price * oi.quantity) AS total_spending
+   FROM customers c
+   JOIN orders o
+      ON c.customer_id = o.customer_id
+   JOIN order_items oi
+      ON o.order_id = oi.order_id
+   JOIN products p
+      ON oi.product_id = p.product_id
+   GROUP BY
+      c.customer_id,
+      c.customer_name
+)
+
+SELECT
+  customer_id,
+  customer_name,
+  ROUND(total_spending, 2) AS total_spending
+FROM customer_spending
+WHERE total_spending > 50000
+ORDER BY total_spending DESC;
+
+
+-- QUERY 58
+-- Assign row numbers to products within each category
+SELECT
+   product_id,
+   product_name,
+   category,
+   price,
+   ROW_NUMBER() OVER (
+      PARTITION BY category
+      ORDER BY price DESC
+   ) AS product_row_number
+FROM products
+ORDER BY category, product_row_number;
+
+
+-- QUERY 59
+-- Rank products by price within each category
+SELECT
+   product_id,
+   product_name,
+   category,
+   price,
+   RANK() OVER (
+     PARTITION BY category
+     ORDER BY price DESC
+   ) AS price_rank
+FROM products
+ORDER BY category, price_rank;
+
+
+-- QUERY 60
+-- Apply dense ranking to products within each category
+SELECT
+   product_id,
+   product_name,
+   category,
+   price,
+   DENSE_RANK() OVER (
+      PARTITION BY category
+      ORDER BY price DESC
+   ) AS price_rank
+FROM products
+ORDER BY category, price_rank;
+
+
+-- QUERY 61
+-- Compare monthly sales with the previous month
+WITH monthly_sales AS (
+   SELECT
+     DATE_TRUNC('month', o.order_date) AS sales_month,
+     SUM(p.price * oi.quantity) AS total_sales
+   FROM orders o
+   JOIN order_items oi
+     ON o.order_id = oi.order_id
+   JOIN products p
+     ON oi.product_id = p.product_id
+   GROUP BY DATE_TRUNC('month', o.order_date)
+)
+
+SELECT
+  sales_month,
+  ROUND(total_sales, 2) AS current_month_sales,
+  ROUND(
+     LAG(total_sales) OVER (ORDER BY sales_month),
+     2
+  ) AS previous_month_sales
+FROM monthly_sales
+ORDER BY sales_month;
+
+
+-- QUERY 62
+-- Compare monthly sales with the next month
+WITH monthly_sales AS (
+   SELECT
+     DATE_TRUNC('month', o.order_date) AS sales_month,
+     SUM(p.price * oi.quantity) AS total_sales
+   FROM orders o
+   JOIN order_items oi
+     ON o.order_id = oi.order_id
+   JOIN products p
+     ON oi.product_id = p.product_id
+   GROUP BY DATE_TRUNC('month', o.order_date)
+)
+
+SELECT
+  sales_month,
+  ROUND(total_sales, 2) AS current_month_sales,
+  ROUND(
+     LEAD(total_sales) OVER (ORDER BY sales_month),
+     2
+  ) AS next_month_sales
+FROM monthly_sales
+ORDER BY sales_month;
+
+
+-- QUERY 63
+-- Calculate month-over-month sales growth
+WITH monthly_sales AS (
+   SELECT
+     DATE_TRUNC('month', o.order_date) AS sales_month,
+     SUM(p.price * oi.quantity) AS total_sales
+   FROM orders o
+   JOIN order_items oi
+     ON o.order_id = oi.order_id
+   JOIN products p
+     ON oi.product_id = p.product_id
+   GROUP BY DATE_TRUNC('month', o.order_date)
+),
+
+sales_comparison AS (
+  SELECT
+    sales_month,
+    total_sales,
+    LAG(total_sales) OVER (
+       ORDER BY sales_month
+    ) AS previous_month_sales
+  FROM monthly_sales
+)
+
+SELECT
+  sales_month,
+  ROUND(total_sales, 2) AS current_month_sales,
+  ROUND(previous_month_sales, 2) AS previous_month_sales,
+  ROUND(
+     ((total_sales - previous_month_sales)
+     / NULLIF(previous_month_sales, 0)) * 100,
+     2
+  ) AS growth_percentage
+FROM sales_comparison
+ORDER BY sales_month;
+
+
+-- QUERY 64
+-- Identify the top 3 products in each category by sales
+WITH product_sales AS (
+    SELECT
+      p.product_id,
+      p.product_name,
+      p.category,
+      SUM(p.price * oi.quantity) AS total_sales
+    FROM products p
+    JOIN order_items oi
+      ON p.product_id = oi.product_id
+    GROUP BY
+      p.product_id,
+      p.product_name,
+      p.category
+),
+
+ranked_products AS (
+  SELECT
+    product_id,
+    product_name,
+    category,
+    total_sales,
+    DENSE_RANK() OVER (
+      PARTITION BY category
+      ORDER BY total_sales DESC
+    ) AS sales_rank
+  FROM product_sales
+)
+
+SELECT
+  product_id,
+  product_name,
+  category,
+  ROUND(total_sales, 2) AS total_sales,
+  sales_rank
+FROM ranked_products
+WHERE sales_rank <= 3
+ORDER BY category, sales_rank;
+
+-- QUERY 65
+-- Extract year and month from order dates
+SELECT
+   order_id,
+   order_date,
+   EXTRACT(YEAR FROM order_date) AS order_year,
+   EXTRACT(MONTH FROM order_date) AS order_month
+FROM orders
+ORDER BY order_date;
+
+
+-- QUERY 66
+-- Group orders by month
+SELECT
+   DATE_TRUNC('month', order_date) AS order_month,
+   COUNT(*) AS total_orders
+FROM orders
+GROUP BY DATE_TRUNC('month', order_date)
+ORDER BY order_month;
+
+
+-- QUERY 67
+-- Calculate days between customer registration and first order
+SELECT
+   c.customer_id,
+   c.customer_name,
+   c.registration_date,
+   MIN(o.order_date) AS first_order_date,
+   MIN(o.order_date) - c.registration_date AS days_to_first_order
+FROM customers c
+JOIN orders o
+   ON c.customer_id = o.customer_id
+GROUP BY
+  c.customer_id,
+  c.customer_name,
+  c.registration_date
+ORDER BY days_to_first_order;
+
+
+-- QUERY 68
+-- Calculate yearly sales revenue
+SELECT
+   EXTRACT(YEAR FROM o.order_date) AS sales_year,
+   ROUND(SUM(p.price * oi.quantity), 2) AS total_sales
+FROM orders o
+JOIN order_items oi
+   ON o.order_id = oi.order_id
+JOIN products p
+   ON oi.product_id = p.product_id
+GROUP BY EXTRACT(YEAR FROM o.order_date)
+ORDER BY sales_year;
+
+
+-- QUERY 69
+-- Calculate monthly order volume
+SELECT
+   DATE_TRUNC('month', order_date) AS order_month,
+   COUNT(order_id) AS total_orders
+FROM orders
+GROUP BY DATE_TRUNC('month', order_date)
+ORDER BY order_month;
+
+
+-- QUERY 70
+-- Calculate the average gap between customer orders
+WITH customer_orders AS (
+   SELECT
+     customer_id,
+     order_date,
+     LAG(order_date) OVER (
+        PARTITION BY customer_id
+        ORDER BY order_date
+     ) AS previous_order_date
+   FROM orders
+)
+
+SELECT
+  ROUND(
+    AVG(order_date - previous_order_date),
+    2
+  ) AS average_days_between_orders
+FROM customer_orders
+WHERE previous_order_date IS NOT NULL;
+
+
+-- QUERY 71
+-- Analyze order volume by day of week
+SELECT
+   TO_CHAR(order_date, 'Day') AS day_of_week,
+   COUNT(*) AS total_orders
+FROM orders
+GROUP BY
+   EXTRACT(DOW FROM order_date),
+   TO_CHAR(order_date, 'Day')
+ORDER BY
+   EXTRACT(DOW FROM order_date);
+
+
+-- QUERY 72
+-- Analyze customer registrations by month
+SELECT
+   DATE_TRUNC('month', registration_date) AS registration_month,
+   COUNT(customer_id) AS new_customers
+FROM customers
+GROUP BY DATE_TRUNC('month', registration_date)
+ORDER BY registration_month;
+
+
+-- QUERY 73
+-- Identify the best-selling product
+SELECT
+    p.product_id,
+    p.product_name,
+    p.category,
+    SUM(oi.quantity) AS total_units_sold
+FROM products p
+JOIN order_items oi
+    ON p.product_id = oi.product_id
+GROUP BY
+    p.product_id,
+    p.product_name,
+    p.category
+ORDER BY total_units_sold DESC
+LIMIT 1;
+
+
+-- QUERY 74
+-- Identify the highest-revenue product
+SELECT
+   p.product_id,
+   p.product_name,
+   p.category,
+   ROUND(SUM(p.price * oi.quantity), 2) AS total_revenue
+FROM products p
+JOIN order_items oi
+    ON p.product_id = oi.product_id
+GROUP BY
+   p.product_id,
+   p.product_name,
+   p.category
+ORDER BY total_revenue DESC
+LIMIT 1;
+
+
+-- QUERY 75
+-- Identify the highest-revenue product category
+SELECT
+    p.category,
+    ROUND(SUM(p.price * oi.quantity), 2) AS total_revenue
+FROM products p
+JOIN order_items oi
+    ON p.product_id = oi.product_id
+GROUP BY p.category
+ORDER BY total_revenue DESC
+LIMIT 1;
+
+
+-- QUERY 76
+-- Identify the highest-value customer
+SELECT
+    c.customer_id,
+    c.customer_name,
+    ROUND(SUM(p.price * oi.quantity), 2) AS total_revenue
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+JOIN products p
+    ON oi.product_id = p.product_id
+GROUP BY
+    c.customer_id,
+    c.customer_name
+ORDER BY total_revenue DESC
+LIMIT 1;
+
+
+-- QUERY 77
+-- Identify the highest-revenue payment method
+SELECT
+   o.payment_method,
+   ROUND(SUM(p.price * oi.quantity), 2) AS total_revenue
+FROM orders o
+JOIN order_items oi
+   ON o.order_id = oi.order_id
+JOIN products p
+   ON oi.product_id = p.product_id
+GROUP BY o.payment_method
+ORDER BY total_revenue DESC
+LIMIT 1;
+
+
+-- QUERY 78
+-- Identify the month with the highest sales revenue
+SELECT
+    DATE_TRUNC('month', o.order_date) AS sales_month,
+    ROUND(SUM(p.price * oi.quantity), 2) AS total_revenue
+FROM orders o
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+JOIN products p
+    ON oi.product_id = p.product_id
+GROUP BY DATE_TRUNC('month', o.order_date)
+ORDER BY total_revenue DESC
+LIMIT 1;
+
+
+-- QUERY 79
+-- Identify repeat customers
+SELECT
+   c.customer_id,
+   c.customer_name,
+   COUNT(o.order_id) AS total_orders
+FROM customers c
+JOIN orders o
+   ON c.customer_id = o.customer_id
+GROUP BY
+   c.customer_id,
+   c.customer_name
+HAVING COUNT(o.order_id) > 1
+ORDER BY total_orders DESC;
+
+
+-- QUERY 80
+-- Calculate the average quantity of products per order
+WITH order_quantities AS (
+   SELECT
+     o.order_id,
+     SUM(oi.quantity) AS total_units
+   FROM orders o
+   JOIN order_items oi
+     ON o.order_id = oi.order_id
+   GROUP BY o.order_id
+)
+
+SELECT
+  ROUND(AVG(total_units), 2) AS average_units_per_order
+FROM order_quantities;
+
+
+-- QUERY 81
+-- Identify the highest-profit product
+SELECT
+    p.product_id,
+    p.product_name,
+    p.category,
+    ROUND(
+       SUM((p.price - p.cost) * oi.quantity),
+       2
+    ) AS total_profit
+FROM products p
+JOIN order_items oi
+    ON p.product_id = oi.product_id
+GROUP BY
+    p.product_id,
+    p.product_name,
+    p.category
+ORDER BY total_profit DESC
+LIMIT 1;
+
+
+-- QUERY 82
+-- Identify the highest-revenue city
+SELECT
+    c.city,
+    ROUND(SUM(p.price * oi.quantity), 2) AS total_revenue
+FROM customers c
+JOIN orders o
+  ON c.customer_id = o.customer_id
+JOIN order_items oi
+  ON o.order_id = oi.order_id
+JOIN products p
+  ON oi.product_id = p.product_id
+GROUP BY c.city
+ORDER BY total_revenue DESC
+LIMIT 1;
+
+
+-- QUERY 83
+-- Identify unsold products
+SELECT
+    p.product_id,
+    p.product_name,
+    p.category,
+    p.price
+FROM products p
+LEFT JOIN order_items oi
+    ON p.product_id = oi.product_id
+WHERE oi.product_id IS NULL
+ORDER BY p.product_id;
+
+
+-- QUERY 84
+-- Calculate customer lifetime revenue
+SELECT
+   c.customer_id,
+   c.customer_name,
+   COUNT(DISTINCT o.order_id) AS total_orders,
+   ROUND(SUM(p.price * oi.quantity), 2) AS lifetime_revenue
+FROM customers c
+JOIN orders o
+   ON c.customer_id = o.customer_id
+JOIN order_items oi
+   ON o.order_id = oi.order_id
+JOIN products p
+   ON oi.product_id = p.product_id
+GROUP BY
+   c.customer_id,
+   c.customer_name
+ORDER BY lifetime_revenue DESC;
+
+
+-- QUERY 85
+-- Calculate profit margin by product category
+SELECT
+  p.category,
+  ROUND(SUM(p.price * oi.quantity), 2) AS total_revenue,
+  ROUND(SUM((p.price - p.cost) * oi.quantity), 2) AS total_profit,
+  ROUND(
+     (SUM((p.price - p.cost) * oi.quantity)
+     / NULLIF(SUM(p.price * oi.quantity), 0)) * 100,
+     2
+  ) AS profit_margin_percentage
+FROM products p
+JOIN order_items oi
+  ON p.product_id = oi.product_id
+GROUP BY p.category
+ORDER BY profit_margin_percentage DESC;
+
+
+-- QUERY 86
+-- Segment customers based on total spending
+WITH customer_spending AS (
+    SELECT
+      c.customer_id,
+      c.customer_name,
+      SUM(p.price * oi.quantity) AS total_spending
+    FROM customers c
+    JOIN orders o
+      ON c.customer_id = o.customer_id
+    JOIN order_items oi
+      ON o.order_id = oi.order_id
+    JOIN products p
+      ON oi.product_id = p.product_id
+    GROUP BY
+      c.customer_id,
+      c.customer_name
+)
+
+SELECT
+  customer_id,
+  customer_name,
+  ROUND(total_spending, 2) AS total_spending,
+  CASE
+    WHEN total_spending >= 100000 THEN 'High Value'
+    WHEN total_spending >= 50000 THEN 'Medium Value'
+    ELSE 'Low Value'
+  END AS customer_segment
+FROM customer_spending
+ORDER BY total_spending DESC;
+
+### QUERY 87 — Best-Selling Product in Each Category
+
+```sql
+-- Identify the best-selling product in each category
+-- Rank products within each category and identify the top-selling product.
+
+WITH product_units AS (
+    SELECT
+        p.product_id,
+        p.product_name,
+        p.category,
+        SUM(oi.quantity) AS total_units_sold
+    FROM products p
+    JOIN order_items oi
+        ON p.product_id = oi.product_id
+    GROUP BY
+        p.product_id,
+        p.product_name,
+        p.category
+),
+
+ranked_products AS (
+    SELECT
+        product_id,
+        product_name,
+        category,
+        total_units_sold,
+        DENSE_RANK() OVER (
+            PARTITION BY category
+            ORDER BY total_units_sold DESC
+        ) AS sales_rank
+    FROM product_units
+)
+
+SELECT
+    product_id,
+    product_name,
+    category,
+    total_units_sold,
+    sales_rank
+FROM ranked_products
+WHERE sales_rank = 1
+ORDER BY category;
+```
+### QUERY 87 — Best-Selling Product in Each Category
+
+```sql
+-- Identify the best-selling product in each category
+-- Rank products within each category and identify the top-selling product.
+
+WITH product_units AS (
+    SELECT
+        p.product_id,
+        p.product_name,
+        p.category,
+        SUM(oi.quantity) AS total_units_sold
+    FROM products p
+    JOIN order_items oi
+        ON p.product_id = oi.product_id
+    GROUP BY
+        p.product_id,
+        p.product_name,
+        p.category
+),
+
+ranked_products AS (
+    SELECT
+        product_id,
+        product_name,
+        category,
+        total_units_sold,
+        DENSE_RANK() OVER (
+            PARTITION BY category
+            ORDER BY total_units_sold DESC
+        ) AS sales_rank
+    FROM product_units
+)
+
+SELECT
+    product_id,
+    product_name,
+    category,
+    total_units_sold,
+    sales_rank
+FROM ranked_products
+WHERE sales_rank = 1
+ORDER BY category;
